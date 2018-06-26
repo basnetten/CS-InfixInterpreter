@@ -41,9 +41,9 @@ namespace InfixInterpreter
 		public static void Main(string[] args)
 		{
 			Interpret(0);
-			Interpret(1);
-			Interpret(2);
-			Interpret(3);
+//			Interpret(1);
+//			Interpret(2);
+//			Interpret(3);
 		}
 
 		public static void Interpret(int index)
@@ -60,89 +60,9 @@ namespace InfixInterpreter
 		{
 			string postfix = string.Empty;
 
-			for (int i = 0; i < infix.Length; i++)
-			{
-				string result = HandleChar(infix, i);
-				if (result.Length > 1)
-				{
-					postfix += result;
-					i       += result.Length - 2;
-				}
-			}
-
+			
+			
 			return postfix;
-		}
-
-		public static string HandleChar(string infix, int index)
-		{
-			char current = infix[index];
-
-			// Is operator.
-			if (Operators.ContainsKey(current))
-			{
-				int precedence = Operators[current];
-
-				string deeperPostfix    = string.Empty;
-				string shallowerPostfix = string.Empty;
-
-				// One operator over.
-				if (index + 2 < infix.Length)
-				{
-					char nextOp = infix[index + 2];
-					if (Operators.ContainsKey(nextOp))
-					{
-						int nextPrecedence = Operators[nextOp];
-
-						if (nextPrecedence < precedence)
-						{
-							deeperPostfix = HandleChar(infix, index + 2);
-						}
-						else
-						{
-							deeperPostfix = infix[index + 1].ToString();
-						}
-					}else
-					{
-						deeperPostfix = infix[index + 1].ToString();
-					}
-				}
-				else
-				{
-					deeperPostfix = infix[index + 1].ToString();
-				}
-
-				if (index - 2 >= 0)
-				{
-					char prevOp = infix[index - 2];
-					if (Operators.ContainsKey(prevOp))
-					{
-						int prevPrecedence = Operators[prevOp];
-
-						if (prevPrecedence > precedence)
-						{
-							shallowerPostfix = infix[index - 1].ToString();
-						}
-					}
-				}
-				else
-				{
-					shallowerPostfix = infix[index - 1].ToString();
-				}
-
-				return $"{shallowerPostfix}{deeperPostfix}{infix[index]}";
-			}
-
-			if (current == OpenParenthesis)
-			{
-				return Interpret(infix.Substring(index+1));
-			}
-
-			if (current == CloseParenthesis)
-			{
-				return "";
-			}
-
-			return infix[index].ToString();
 		}
 	}
 }
