@@ -43,18 +43,18 @@ namespace InfixInterpreter
 
 		public static void Main(string[] args)
 		{
-//			Interpret(0);
-//			Interpret(1);
-//			Interpret(2);
-//			Interpret(3);
-//			Interpret(4);
+			Interpret(0);
+			Interpret(1);
+			Interpret(2);
+			Interpret(3);
+			Interpret(4);
 			Interpret(5);
 		}
 
 		public static void Interpret(int index)
 		{
 			string input    = Infixes[index];
-			string actual   = InfixToPostfix.Interpret(input);
+			string actual   = InToPo.Interpret(input);
 			string expected = PostFixes[index];
 			bool   equal    = actual == expected;
 
