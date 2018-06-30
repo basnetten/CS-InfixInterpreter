@@ -1,16 +1,24 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Xml.Schema;
 
 namespace InfixInterpreter
 {
 	public class InfixToPostfix
 	{
-		/**
-		 * When talking about precedence, lower values should be handled first.
-		 */
+		/// <summary>
+		/// The open parenthesis character.
+		/// </summary>
+		public const char OpenParenthesis = '(';
 
+		/// <summary>
+		/// The close parenthesis character.
+		/// </summary>
+		public const char CloseParenthesis = ')';
+
+		/// <summary>
+		/// The operators that are known to the interpreter, together with their
+		/// precedences. A lower precedence means that it will be handled first.
+		/// </summary>
 		public static Dictionary<char, int> OperatorPrecedences { get; }
 			= new Dictionary<char, int>
 			{
@@ -20,30 +28,21 @@ namespace InfixInterpreter
 				{ '/', 1 },
 			};
 
-		public const char OpenParenthesis  = '(';
-		public const char CloseParenthesis = ')';
-
+		/// <summary>
+		/// Interprets an infix string to a postfix or polish notation string.
+		/// </summary>
+		/// <param name="infix">The infix string.</param>
+		/// <returns>The postfix string.</returns>
 		public static string Interpret(string infix)
 		{
+			// Separate the variables from the operators in the infix string.
 			(string stringVariables, string stringOperators) =
 				GetVariablesAndOperatorsFromString(infix);
 
-			List<Operator> operatorList =
-				GetOperatorsFromOperatorsString(stringOperators);
+			Operator tree =
+				ConstructOperationTree(stringOperators, stringVariables);
 
-			bool[] operatorIsChild =
-				GenerateTreeFromOperatorList(operatorList);
-
-			Operator head =
-				GetHeadFromOperatorList(operatorList, operatorIsChild);
-
-			Console.WriteLine($"stringVariables {stringVariables}");
-			Console.WriteLine($"stringOperators {stringOperators}");
-			Console.WriteLine($"operatorList {string.Join(", ",    operatorList)}");
-			Console.WriteLine($"operatorIsChild {string.Join(", ", operatorIsChild)}");
-			Console.WriteLine($"head {head}");
-
-			return head.Postfix();
+			return tree.Postfix();
 		}
 
 		/// <summary>
@@ -64,13 +63,13 @@ namespace InfixInterpreter
 			GetVariablesAndOperatorsFromString(string str)
 		{
 			// Initialize local variables.
-			string variables = String.Empty;
-			string operators = String.Empty;
+			string variables = string.Empty;
+			string operators = string.Empty;
 
 			// Add each character of the string to either the operators or the variables.
 			foreach (char c in str)
 			{
-				if (IsOperator(c))
+				if (CharIsOperator(c))
 					operators += c;
 				else
 					variables += c;
@@ -78,6 +77,143 @@ namespace InfixInterpreter
 
 			// Return a tuple with the information.
 			return (variables, operators);
+		}
+
+		/// <summary>
+		/// Check whether or not the character is a known operator. The known
+		/// operators are stored in <see cref="OperatorPrecedences"/>.
+		/// </summary>
+		/// <param name="c"></param>
+		/// <returns></returns>
+		public static bool CharIsOperator(char c)
+		{
+			return OperatorPrecedences.ContainsKey(c)
+			       || c == OpenParenthesis
+			       || c == CloseParenthesis;
+		}
+
+		public static Operator ConstructOperationTree(string stringOperators, string stringVariables)
+		{
+			List<Operator> operatorList =
+				GetOperatorsFromOperatorsString(stringOperators);
+
+			ConnectSameParenthesesDepth(operatorList);
+
+			ConnectDifferentParenthesesDepths(operatorList);
+
+			AddVariablesAsLeafs(operatorList, stringVariables);
+
+			return GetHeadOfTree(operatorList);
+		}
+
+		public static Operator GetHeadOfTree(List<Operator> operatorList)
+		{
+			return operatorList.Find(o => !o.HasParent);
+		}
+
+		public static void AddVariablesAsLeafs(List<Operator> operatorList, string stringVariables)
+		{
+			int numOfVariablesAssigned = 0;
+			foreach (Operator @operator in operatorList)
+			{
+				if (@operator.Left == null)
+				{
+					@operator.Left = new Operator(
+						stringVariables[numOfVariablesAssigned],
+						@operator.ParenthesesDepth,
+						@operator.Precedence,
+						true);
+					numOfVariablesAssigned++;
+				}
+
+				if (@operator.Right == null)
+				{
+					@operator.Right = new Operator(
+						stringVariables[numOfVariablesAssigned],
+						@operator.ParenthesesDepth,
+						@operator.Precedence,
+						true);
+					numOfVariablesAssigned++;
+				}
+			}
+		}
+
+		public static void ConnectDifferentParenthesesDepths(List<Operator> operatorList)
+		{
+			for (int i = 0; i < operatorList.Count; i++)
+			{
+				Operator op = operatorList[i];
+				if (i != 0)
+				{
+					int      j    = i;
+					Operator left = null;
+					// 
+					while (true)
+					{
+						j--;
+						if (j < 0) break;
+						Operator next = operatorList[j];
+						if (next.ParenthesesDepth != op.ParenthesesDepth + 1) break;
+
+						left = next;
+						if (!left.HasParent) break;
+					}
+
+					if (left != null && !left.HasParent)
+					{
+						op.Left        = left;
+						left.HasParent = true;
+					}
+				}
+
+				if (i != operatorList.Count - 1)
+				{
+					int      j     = i;
+					Operator right = null;
+					// 
+					while (true)
+					{
+						j++;
+						if (j > operatorList.Count - 1) break;
+						Operator next = operatorList[j];
+						if (next.ParenthesesDepth != op.ParenthesesDepth + 1) break;
+
+						right = next;
+						if (!right.HasParent) break;
+					}
+
+					if (right != null && !right.HasParent)
+					{
+						op.Right        = right;
+						right.HasParent = true;
+					}
+				}
+			}
+		}
+
+		public static void ConnectSameParenthesesDepth(List<Operator> operatorList)
+		{
+			for (var i = 1; i < operatorList.Count; i++)
+			{
+				Operator op     = operatorList[i];
+				Operator opPrev = operatorList[i - 1];
+
+				if (op.ParenthesesDepth != opPrev.ParenthesesDepth) continue;
+
+				// op should be a child of previous. (lower precedence)
+				if (op.Precedence < opPrev.Precedence)
+				{
+					opPrev.Right = op;
+					op.HasParent = true;
+				}
+				// Previous should be a child of op. (previous has lower or
+				// equal precedence)
+				else
+				{
+					op.Left          = opPrev;
+					opPrev.HasParent = true;
+				}
+			}
 		}
 
 		public static List<Operator>
@@ -102,108 +238,43 @@ namespace InfixInterpreter
 
 			return operators;
 		}
+	}
 
-		public static bool[]
-			GenerateTreeFromOperatorList(List<Operator> operatorList)
+	public class Operator
+	{
+		public Operator(char value,
+		                int  parenthesesDepth,
+		                int  precedence,
+		                bool isLeaf)
 		{
-			bool[] operatorIsChild = new bool[operatorList.Count];
-			for (int i = 0; i < operatorList.Count; i++)
-			{
-				Operator current = operatorList[i];
-				if (i > 0)
-				{
-					if (current.ConnectLeft(operatorList[i - 1]))
-						operatorIsChild[i - 1] = true;
-				}
-
-				if (i < operatorList.Count - 1)
-				{
-					if (current.ConnectRight(operatorList[i + 1]))
-						operatorIsChild[i + 1] = true;
-				}
-			}
-
-			return operatorIsChild;
+			Value            = value;
+			ParenthesesDepth = parenthesesDepth;
+			Precedence       = precedence;
+			IsLeaf           = isLeaf;
 		}
 
-		public static Operator
-			GetHeadFromOperatorList(List<Operator> operatorList,
-			                        bool[]         operatorIsChild)
+		// TODO make better.
+		public char Value            { get; set; }
+		public int  ParenthesesDepth { get; set; }
+		public int  Precedence       { get; set; }
+
+		public bool     IsLeaf    { get; set; }
+		public bool     HasParent { get; set; }
+		public Operator Left      { get; set; }
+		public Operator Right     { get; set; }
+
+		public string Postfix()
 		{
-			return operatorList.Where((node, i) => !operatorIsChild[i]).First();
+			if (IsLeaf)
+				return $"{Value}";
+			else
+				return $"{Left?.Postfix()}{Right?.Postfix()}{Value}";
 		}
 
-		public static bool IsOperator(char c)
+		public override string ToString()
 		{
-			return OperatorPrecedences.ContainsKey(c)
-			       || c == OpenParenthesis
-			       || c == CloseParenthesis;
-		}
-
-		public class Operator
-		{
-			public Operator(char value,
-			                int  parenthesesDepth,
-			                int  precedence,
-			                bool isLeaf)
-			{
-				Value            = value;
-				ParenthesesDepth = parenthesesDepth;
-				Precedence       = precedence;
-				IsLeaf           = isLeaf;
-			}
-
-			// TODO make better.
-			public char Value            { get; set; }
-			public int  ParenthesesDepth { get; set; }
-			public int  Precedence       { get; set; }
-
-			public bool     IsLeaf { get; set; }
-			public Operator Left   { get; set; }
-			public Operator Right  { get; set; }
-
-			public bool ConnectLeft(Operator other)
-			{
-				if (IsLeaf) return false;
-
-				// If this is deeper, this should be child of other.
-				bool deeper = ParenthesesDepth > other.ParenthesesDepth;
-
-				// If this precedes other, this should be child of other.
-				if (deeper) return false;
-//				if (!(Precedence < other.Precedence && !deeper)) return false;
-
-				Left = other;
-				return true;
-			}
-
-			public bool ConnectRight(Operator other)
-			{
-				if (IsLeaf) return false;
-
-				// If this is deeper, this should be child of other.
-				bool deeper = ParenthesesDepth > other.ParenthesesDepth;
-
-				// If this precedes other, this should be child of other.
-				if (deeper) return false;
-//				if (!(Precedence < other.Precedence && !deeper)) return false;
-
-				Right = other;
-				return true;
-			}
-
-			public string Postfix()
-			{
-				if (IsLeaf)
-					return $"{Value}";
-				else
-					return $"{Left?.Postfix()}{Right?.Postfix()}{Value}";
-			}
-
-			public override string ToString()
-			{
-				return $"{Value}({ParenthesesDepth},{Precedence})";
-			}
+			return $"{Value}({ParenthesesDepth},{Precedence}) " +
+			       $"=> [{Left?.Value}][{Right?.Value}]";
 		}
 	}
 }

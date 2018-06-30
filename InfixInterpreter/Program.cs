@@ -54,7 +54,7 @@ namespace InfixInterpreter
 		public static void Interpret(int index)
 		{
 			string input    = Infixes[index];
-			string actual   = InToPo.Interpret(input);
+			string actual   = InfixToPostfix.Interpret(input);
 			string expected = PostFixes[index];
 			bool   equal    = actual == expected;
 
